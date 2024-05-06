@@ -11,7 +11,11 @@ const port = process.env.PORT || 5000;
 
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "http://localhost:5173",
+      "https://cars-doctor-bfc9b.web.app",
+      "https://cars-doctor-bfc9b.firebaseapp.com",
+    ],
     credentials: true,
   })
 );
@@ -37,7 +41,8 @@ const logger = async (req, res, next) => {
 
 const verifyToken = async (req, res, next) => {
   const token = req.cookies?.token;
-  console.log("value of token in middleware", token);
+  // console.log("value of token in middleware", token);
+  // no token available
   if (!token) {
     return res.status(401).send({ message: "unauthorized access" });
   }
@@ -54,10 +59,16 @@ const verifyToken = async (req, res, next) => {
   });
 };
 
+const cookieOption = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production" ? true : false,
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const serviceCollection = client.db("carDoctor").collection("services");
     const bookingCollection = client.db("carDoctor").collection("bookings");
@@ -69,12 +80,14 @@ async function run() {
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "1h",
       });
+      res.cookie("token", token, cookieOption).send({ success: true });
+    });
 
+    app.post("/logOut", (req, res) => {
+      const user = req.body;
+      console.log("login out", user);
       res
-        .cookie("token", token, {
-          httpOnly: true,
-          secure: false,
-        })
+        .clearCookie("token", { ...cookieOption, maxAge: 0 })
         .send({ success: true });
     });
 
@@ -100,12 +113,11 @@ async function run() {
     // Bookings related API
     app.get("/bookings", logger, verifyToken, async (req, res) => {
       console.log(req.query.email);
-      // console.log("tokennnnnnnnnnnnnnnn", req.cookies.token);
-      console.log('user in the valid token', req.user);
-      if(req.query.email !== req.user.email){
-        return res.status(403).send({message: 'forbidden access'})
+      // console.log("tok tok token", req.cookies.token);
+      console.log("User in the valid token", req.user);
+      if (req.query.email !== req.user.email) {
+        return res.status(403).send({ message: "forbidden access" });
       }
-
 
       let query = {};
       if (req.query?.email) {
@@ -142,7 +154,7 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
