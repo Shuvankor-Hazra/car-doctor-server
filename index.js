@@ -4,8 +4,8 @@ const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
-const app = express();
 const port = process.env.PORT || 5000;
+const app = express();
 
 // Middleware
 
@@ -22,7 +22,7 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-const uri = `mongodb+srv://${process.env.BD_USER}:${process.env.BD_PASS}@cluster0.fi65pdm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.fi65pdm.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -78,7 +78,7 @@ async function run() {
       const user = req.body;
       console.log(user);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1h",
+        expiresIn: "365d",
       });
       res.cookie("token", token, cookieOption).send({ success: true });
     });
@@ -92,16 +92,52 @@ async function run() {
     });
 
     // Services related API
-    app.get("/services", logger, async (req, res) => {
-      const cursor = serviceCollection.find();
+    app.get("/services", async (req, res) => {
+      const filter = req.query;
+      console.log(filter);
+      const query = {
+        // price: { $lt: 100 },
+        title: { $regex: filter.search, $options: "i" },
+      };
+      const options = {
+        sort: {
+          price: filter.sort === "asc" ? 1 : -1,
+        },
+      };
+      const cursor = serviceCollection.find(query, options);
       const result = await cursor.toArray();
       res.send(result);
     });
+    // ----------------------------
 
+    // Services related API
+    // app.get("/services", logger, async (req, res) => {
+    //   const filter = req.query;
+    //   console.log(filter);
+    //   const query = {
+    //     // price: { $lt: 100 },
+    //   };
+    //   // Retrieve data from the database and convert price to number
+    //   const cursor = serviceCollection.find(query).map((service) => ({
+    //     ...service,
+    //     price: parseFloat(service.price),
+    //   }));
+    //   // Custom sorting function for numeric values
+    //   const numericSort = (a, b) => a.price - b.price;
+    //   let result = await cursor.toArray();
+    //   // Sort the data based on the numeric price values
+    //   if (filter.sort === "asc") {
+    //     result = result.sort(numericSort);
+    //   } else if (filter.sort === "desc") {
+    //     result = result.sort((a, b) => numericSort(b, a)); // Reverse sorting for descending
+    //   }
+    //   res.send(result);
+    // });
+
+    // ----------------------------
     app.get("/services/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
-
       const options = {
         projection: { title: 1, price: 1, service_id: 1, img: 1, email: 1 },
       };
@@ -166,7 +202,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send("Doctor is running");
+  res.send("Doctor is running.....");
 });
 
 app.listen(port, () => {
